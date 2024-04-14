@@ -47,12 +47,12 @@ class ExecutionAlgorithm:
         process_node(root)
 
         response_xml = ET.tostring(root, encoding='unicode')
-        print(response_xml)
+        #print(response_xml)
         return response_xml
         
     def process_task_bfs(self, xml_string):
         xml_string = clean_xml(xml_string)
-        print(f"xml_string:\n{xml_string}")
+        #print(f"xml_string:\n{xml_string}")
         root = ET.fromstring(xml_string)
         queue = deque([root])
 
@@ -78,5 +78,5 @@ class ExecutionAlgorithm:
                     queue.append(sub_tasks)
                     
         response_xml = ET.tostring(root, encoding='unicode')
-        print(f"Updated XML After Tool Executions:\n{response_xml}")
+        #print(f"Updated XML After Tool Executions:\n{response_xml}")
         return response_xml
