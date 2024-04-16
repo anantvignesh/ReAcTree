@@ -23,9 +23,29 @@ Here's a simple example of how to use ReAcTree:
 ```python
 from TaskTreePrompting import TaskTree
 
-# Initialize the bot with Langchain tools
-tools = # (Specify your Langchain tools configuration here)
+from langchain.agents import load_tools
+from langchain_community.agent_toolkits import FileManagementToolkit
+from langchain.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+
+# Langchain Tool Configs
+# file management tools
+toolkit = FileManagementToolkit(root_dir="./tmp")
+file_management_tools = toolkit.get_tools()
+# wikipedia tool
+wikipedia = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+# create a list of all tools
+tools = load_tools(["arxiv"]) + file_management_tools + [wikipedia]
+
+# bot initialization
 bot = TaskTree(langchainTools=tools)
+
+message = "List all the latest papers in Generative AI"
+# call the bot with a tree traversal algorithm of your choice based on the task
+#response = bot.get_reply_bfs(message, verbose=True)
+response = bot.get_reply_bfs(message, verbose=True)
+
+print(response)
 ```
 
 This setup will enable the AI to create a Task Tree, execute tasks in a specified order, and compile the results efficiently.
