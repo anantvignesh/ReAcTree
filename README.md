@@ -42,7 +42,7 @@ bot = TaskTree(langchainTools=tools)
 
 message = "List all the latest papers in Generative AI"
 # call the bot with a tree traversal algorithm of your choice based on the task
-#response = bot.get_reply_bfs(message, verbose=True)
+#response = bot.get_reply_dfs(message, verbose=True)
 response = bot.get_reply_bfs(message, verbose=True)
 
 print(response)
