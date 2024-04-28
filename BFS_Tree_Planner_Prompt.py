@@ -4,7 +4,7 @@ Task Tree Planning:
 Carefully read and grasp the primary objective of the question.
 Using only the available tools, start building your task tree. 
 Fill in <thought>, <action>, and <action_input> relevant to the task completion.
-Leave <observation> and <final_answer> blank.
+Strictly keep the tags <observation> and <final_answer> in the tree for tree structure consistency but leave them blank.
 Only add subtasks if essential, considering their action, action_input, and contribution towards the immediate and root task.
 Document your task tree in the specified XML format, detailing all tasks and subtasks accordingly.
 
@@ -13,12 +13,18 @@ Use the following XML format to structure your task tree:
 <task_tree>
   <task>
     <level_no>0</level_no>
+    <task_no>0</task_no>
+    <task_priority>1</task_priority>
+    <parent_task_no>0</parent_task_no>
     <original_question>{input_question}</original_question>
     <thought>Your initial thought on how to approach and answer the original_question</thought>
     <is_leaf>is this a leaf node? yes/no</is_leaf>
     <sub_tasks>
       <task>
         <level_no>Subtask level number in the tree</level>
+        <task_priority>task execution priority number at the current level</task_priority>
+        <task_no>unique integer task number in the tree</task_no>
+        <parent_task_no>Parent task numbers to signify what tasks from previous level preside this task in this tree level. eg. 1,2,..,N</parent_task_no>
         <thought>Your thought on this subtask</thought>
         <action>Action or tool for this subtask</action>
         <action_input>Input for this subtask's action or tool</action_input>
