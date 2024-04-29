@@ -34,9 +34,18 @@ class ExecutionAlgorithm:
                     action = task.find('action').text
                     action_input = task.find('action_input').text
                     observation = task.find('observation')
-                    #print(f"tool: {action} | tool_input: {action_input}")
-                    result = self._execute_tool(action, action_input)
-                    observation.text = result
+
+                    try:
+                        # print(f"tool: {action} | tool_input: {action_input}")
+                        print(f"Executing task no {task.find('task_no').text} with action: {action}")
+                        result = self._execute_tool(action, action_input)
+                        observation.text = result
+                    except Exception as e:
+                        print(f"Tool execution failed for action: {action}\n due to error: {e}")
+                        observation.text = "Tool execution failed."
+
+                    # result = self._execute_tool(action, action_input)
+                    # observation.text = result
 
                 # process any subtask to the queue by traversing deeper recursively
                 sub_tasks = task.find('sub_tasks')
@@ -68,9 +77,18 @@ class ExecutionAlgorithm:
                     action = task.find('action').text
                     action_input = task.find('action_input').text
                     observation = task.find('observation')
-                    #print(f"tool: {action} | tool_input: {action_input}")
-                    result = self._execute_tool(action, action_input)
-                    observation.text = result
+
+                    try:
+                        # print(f"tool: {action} | tool_input: {action_input}")
+                        print(f"Executing task no {task.find('task_no').text} with action: {action}")
+                        result = self._execute_tool(action, action_input)
+                        observation.text = result
+                    except Exception as e:
+                        print(f"Tool execution failed for action: {action}\n due to error: {e}")
+                        observation.text = "Tool execution failed."
+
+                    # result = self._execute_tool(action, action_input)
+                    # observation.text = result
 
                 # add any subtask to the queue
                 sub_tasks = task.find('sub_tasks')
