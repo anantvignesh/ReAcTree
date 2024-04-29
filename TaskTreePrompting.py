@@ -116,6 +116,17 @@ class TaskTree:
 
         return original_question
 
+    def replanner(self, xml_string):
+        """
+        Replans the task tree based on the observations made from the results of different tools.
+        Args:
+            xml_string:
+
+        Returns:
+            str: updated task tree in XML format.
+        """
+        pass
+
     def get_reply_bfs(self, message, verbose=False):
         self.verbose = verbose
         response = self.bfs_react_chain.invoke({"input_question": message, "tools": convert_tools(self.tools)})
