@@ -12,13 +12,14 @@ def convert_tools(tools):
     return "\n".join([f"{tool.name}: {tool.description}" for tool in tools])
 
 class TaskTree:
-    def __init__(self, langchainTools, verbose=False):
+    def __init__(self, langchainTools, verbose=False, replan_enable=False):
         self.verbose = verbose
-        self.model = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0.1, max_tokens=4096)
+        self.replan_enable = replan_enable
+        self.model = ChatOpenAI(model="gpt-4o", temperature=0.1, max_tokens=4096)
         self.tools = langchainTools
 
         # Provide list of tools to the BFS react executor
-        self.exec_algo = ExecutionAlgorithm(list_of_tools=self.tools)
+        self.exec_algo = ExecutionAlgorithm(list_of_tools=self.tools, replan_enable=self.replan_enable, verbose=self.verbose)
 
         # load prompts
         self.task_planner_prompt = PromptTemplate.from_template(task_planner_prompt_template_xml)
@@ -115,17 +116,6 @@ class TaskTree:
         original_question = root.find(".//original_question").text
 
         return original_question
-
-    def replanner(self, xml_string):
-        """
-        Replans the task tree based on the observations made from the results of different tools.
-        Args:
-            xml_string:
-
-        Returns:
-            str: updated task tree in XML format.
-        """
-        pass
 
     def get_reply_bfs(self, message, verbose=False):
         self.verbose = verbose
