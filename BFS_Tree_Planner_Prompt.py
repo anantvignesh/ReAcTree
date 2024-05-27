@@ -61,6 +61,7 @@ Retain the tags <observation> and <final_answer> for tree structure consistency 
 Only add new subtasks if essential, considering their action, action_input, and contribution towards the immediate and root task.
 Document your updated task tree in the specified XML format.
 
+DO NOT GENERATE REASONS. YOU WILL EITHER GENERATE AN UPDATED TASK TREE XML OR RETURN "<NO_REPLAN>".
 REPLAN THE TASK TREE ONLY IF NECESSARY. DO NOT MAKE CHANGES FOR THE SAKE OF IT.
 IF THE TASK TREE IS ALREADY OPTIMAL, DO NOT MAKE ANY CHANGES. JUST RETURN "<NO_REPLAN>".
 

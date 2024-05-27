@@ -134,7 +134,10 @@ class ExecutionAlgorithm:
         tool = self.tools.get(action)
         if not tool:
             raise ValueError(f"Tool {action} not found.")
-        return tool.execute(action_input)
+        print(f"Executing tool {action} with input: {action_input}")
+        result = tool.run(action_input)
+        #print(f"Tool {action} executed successfully. Result is {result}" )
+        return result
 
     def _execute_task(self, task: ET.Element) -> ET.Element:
         """
@@ -143,6 +146,8 @@ class ExecutionAlgorithm:
         Args:
             task (ET.Element): The task element to be executed.
         """
+        print(f"Executing task:\n{ET.tostring(task, encoding='unicode')}") # Logging statement
+
         action = task.find('action').text
         action_input = task.find('action_input').text
         observation = task.find('observation')
@@ -154,7 +159,100 @@ class ExecutionAlgorithm:
             task.find('observation').text = "Tool execution failed."
             print(f"Tool execution failed for action: {action} due to error: {e}")
 
+        #print(f"Task result: \n{task.find('observation').text}")
         return task
+
+    def process_task_bfs_parallel(self, xml_string: str) -> str:
+        """
+        Execute tasks in a breadth-first search (BFS) manner and optionally replan.
+
+        Args:
+            xml_string (str): The task tree in XML format.
+
+        Returns:
+            str: The final task tree in XML format after execution and replanning.
+        """
+        xml_string = clean_xml(xml_string)
+        root = ET.fromstring(xml_string)
+        queue = deque([root])
+
+        while queue:
+            node = queue.popleft()
+            tasks = node.findall('.//task')
+
+            with ThreadPoolExecutor() as executor:
+                futures = {executor.submit(self._execute_task, task): task for task in tasks if task.find('.//level_no').text.strip() != "0" and task.find('.//observation').text is None}
+                print(f"Futures submitted: {futures}")  # Logging statement
+
+                for future in as_completed(futures):
+                    task = futures[future]
+                    try:
+                        future.result()
+                        # Ensure the updated task is correctly placed back in the original tree
+                        #node.replace(task, updated_task)
+                    except Exception as e:
+                        print(f"Task {task.find('.//task_no').text} failed due to {e}")
+
+            for task in tasks:
+                sub_tasks = task.find('.//sub_tasks')
+                if sub_tasks is not None:
+                    queue.extend(sub_tasks.findall('.//task'))
+
+            if self.replan_enable:
+                current_tree = ET.tostring(root, encoding='unicode')
+                replan_xml = self.replanner(current_tree, self.list_of_tools_str)
+                if replan_xml != "<NO_REPLAN>":
+                    root = ET.fromstring(replan_xml)
+                    queue = deque([root])
+
+        response_xml = ET.tostring(root, encoding='unicode')
+        return response_xml
+
+    def process_task_dfs_parallel(self, xml_string: str) -> str:
+        """
+        Execute tasks in a depth-first search (DFS) manner and optionally replan.
+
+        Args:
+            xml_string (str): The task tree in XML format.
+
+        Returns:
+            str: The final task tree in XML format after execution and replanning.
+        """
+        xml_string = clean_xml(xml_string)
+        root = ET.fromstring(xml_string)
+        stack = [root]
+
+        while stack:
+            current_node = stack.pop()
+            tasks = current_node.findall('.//task')
+
+            with ThreadPoolExecutor() as executor:
+                futures = {executor.submit(self._execute_task, task): task for task in tasks if task.find('.//level_no').text.strip() != "0" and task.find('.//observation').text is None}
+                print(f"Futures submitted: {futures}")  # Logging statement
+
+                for future in as_completed(futures):
+                    task = futures[future]
+                    try:
+                        future.result()
+                        # Ensure the updated task is correctly placed back in the original tree
+                        #current_node.replace(task, updated_task)
+                    except Exception as e:
+                        print(f"Task {task.find('.//task_no').text} failed due to {e}")
+
+            for task in reversed(tasks):
+                sub_tasks = task.find('.//sub_tasks')
+                if sub_tasks is not None:
+                    stack.extend(sub_tasks.findall('.//task'))
+
+            if self.replan_enable:
+                current_tree = ET.tostring(root, encoding='unicode')
+                replan_xml = self.replanner(current_tree, self.list_of_tools_str)
+                if replan_xml != "<NO_REPLAN>":
+                    root = ET.fromstring(replan_xml)
+                    stack = [root]
+
+        response_xml = ET.tostring(root, encoding='unicode')
+        return response_xml
 
     def process_task_bfs(self, xml_string: str) -> str:
         """
@@ -168,31 +266,25 @@ class ExecutionAlgorithm:
         """
         xml_string = clean_xml(xml_string)
         root = ET.fromstring(xml_string)
-
         queue = deque([root])
 
         while queue:
             node = queue.popleft()
-            tasks = node.findall('task')
-
-            with ThreadPoolExecutor() as executor:
-                futures = {executor.submit(self._execute_task, task): task for task in tasks if
-                           task.find('level_no').text.strip() != "0"}
-
-                for future in as_completed(futures):
-                    task = futures[future]
-                    try:
-                        future.result()
-                    except Exception as e:
-                        print(f"Task {task.find('task_no').text} failed due to {e}")
+            tasks = node.findall('.//task')
 
             for task in tasks:
-                sub_tasks = task.find('sub_tasks')
+                if task.find('.//level_no').text.strip() != "0" and task.find('.//observation').text is None:
+                    try:
+                        self._execute_task(task)
+                    except Exception as e:
+                        print(f"Task {task.find('.//task_no').text} failed due to {e}")
+
+            for task in tasks:
+                sub_tasks = task.find('.//sub_tasks')
                 if sub_tasks is not None:
-                    queue.extend(sub_tasks.findall('task'))
+                    queue.extend(sub_tasks.findall('.//task'))
 
             if self.replan_enable:
-                # Ensure that the updated XML tree with observations is sent to the replanner
                 current_tree = ET.tostring(root, encoding='unicode')
                 replan_xml = self.replanner(current_tree, self.list_of_tools_str)
                 if replan_xml != "<NO_REPLAN>":
@@ -214,30 +306,25 @@ class ExecutionAlgorithm:
         """
         xml_string = clean_xml(xml_string)
         root = ET.fromstring(xml_string)
-
         stack = [root]
 
         while stack:
             current_node = stack.pop()
-            tasks = current_node.findall('task')
+            tasks = current_node.findall('.//task')
 
-            with ThreadPoolExecutor() as executor:
-                futures = {executor.submit(self._execute_task, task): task for task in tasks if task.find('level_no').text.strip() != "0"}
-
-                for future in as_completed(futures):
-                    task = futures[future]
+            for task in tasks:
+                if task.find('.//level_no').text.strip() != "0" and task.find('.//observation').text is None:
                     try:
-                        future.result()
+                        self._execute_task(task)
                     except Exception as e:
-                        print(f"Task {task.find('task_no').text} failed due to {e}")
+                        print(f"Task {task.find('.//task_no').text} failed due to {e}")
 
             for task in reversed(tasks):
-                sub_tasks = task.find('sub_tasks')
+                sub_tasks = task.find('.//sub_tasks')
                 if sub_tasks is not None:
-                    stack.extend(sub_tasks.findall('task'))
+                    stack.extend(sub_tasks.findall('.//task'))
 
             if self.replan_enable:
-                # Ensure that the updated XML tree with observations is sent to the replanner
                 current_tree = ET.tostring(root, encoding='unicode')
                 replan_xml = self.replanner(current_tree, self.list_of_tools_str)
                 if replan_xml != "<NO_REPLAN>":
