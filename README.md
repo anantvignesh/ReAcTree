@@ -59,6 +59,12 @@ This setup will enable the AI to create a Task Tree, execute tasks in a specifie
 - **Efficient Result Compilation**: Results of task executions are embedded within the XML under the `<observation>` tags, with the system extracting observations from leaf nodes only to optimize performance and accuracy.
 - **Compatibility with Langchain Tools**: Designed to be compatible with existing Langchain tools, facilitating easy integration and widespread adoption.
 
+### Recent Updates
+
+- **Improved Execution Algorithms**: Enhanced BFS and DFS execution algorithms with both parallel and non-parallel versions.
+- **Verbose Logging**: Added verbose logging options to provide detailed insights during task execution and planning.
+- **Replanning Capability**: Integrated replanning capability to dynamically adjust the task tree based on intermediate results.
+
 ## Disclaimer
 
 ReAcTree is under active development. Features and documentation may evolve over time. We encourage you to star and watch this repository for updates on exciting new features and improvements.
