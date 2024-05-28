@@ -6,7 +6,7 @@ from HelperMethods import clean_xml
 from langchain_openai import ChatOpenAI
 import xml.etree.ElementTree as ET
 
-def convert_tools(tools):
+def tool_name_and_description(tools):
     """
     Convert a list of tools to a formatted string.
 
@@ -17,6 +17,18 @@ def convert_tools(tools):
         str: A formatted string representation of the tools.
     """
     return "\n".join([f"{tool.name}: {tool.description}" for tool in tools])
+
+def tool_name(tools):
+    """
+    Convert a list of tools to a formatted string.
+
+    Args:
+        tools (list): A list of tool objects.
+
+    Returns:
+        str: A formatted string representation of the tools.
+    """
+    return ", ".join([tool.name for tool in tools])
 
 class TaskTree:
     """
@@ -173,7 +185,9 @@ class TaskTree:
         Returns:
             str: The response from the tree planner chain.
         """
-        response = self.tree_planner_chain.invoke({"input_question": message, "tools": convert_tools(self.tools)})
+        response = self.tree_planner_chain.invoke({"input_question": message,
+                                                   "tools": tool_name_and_description(self.tools),
+                                                   "tools_available": tool_name(self.tools)})
         return "```xml\n"+response+"\n```"
 
     def get_reply_bfs(self, message, verbose=False):
@@ -188,7 +202,9 @@ class TaskTree:
             str: The response from the BFS execution chain.
         """
         self.verbose = verbose
-        response = self.bfs_react_chain.invoke({"input_question": message, "tools": convert_tools(self.tools)})
+        response = self.bfs_react_chain.invoke({"input_question": message,
+                                                "tools": tool_name_and_description(self.tools),
+                                                "tools_available": tool_name(self.tools)})
         return response
 
     def get_reply_dfs(self, message, verbose=False):
@@ -203,5 +219,7 @@ class TaskTree:
             str: The response from the DFS execution chain.
         """
         self.verbose = verbose
-        response = self.dfs_react_chain.invoke({"input_question": message, "tools": convert_tools(self.tools)})
+        response = self.dfs_react_chain.invoke({"input_question": message,
+                                                "tools": tool_name_and_description(self.tools),
+                                                "tools_available": tool_name(self.tools)})
         return response

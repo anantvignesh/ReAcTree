@@ -1,4 +1,11 @@
-langchain
+langchain==0.1.20
+langchain-core==0.1.52
+langchain-community==0.0.38
+langchain_experimental==0.0.59
+langchain-google-genai
+langchain-google-vertexai
+langchain-openai
+langchainhub
 chromadb
 openai
 bs4
@@ -7,7 +14,6 @@ pandas
 asyncio
 gradio
 faiss-cpu
-langchain_experimental
 playwright
 tiktoken
 transformers
@@ -15,14 +21,11 @@ asyncpg
 google-cloud-bigquery
 pandas
 vertexai
-langchain-google-genai
-langchain-google-vertexai
 gcsfs
 jupyterlab
-langchain-community
-langchain-openai
 psycopg2
 asyncpg
-langchainhub
 db-dtypes
 google-api-python-client
+numexpr
+duckduckgo-search

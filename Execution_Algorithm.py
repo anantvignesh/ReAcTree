@@ -77,7 +77,7 @@ class ExecutionAlgorithm:
             # which is not a proper XML which might create error if not handled
             clean = modelResponse.content
         if self.verbose:
-            print(f"Task Tree XML:\n{clean}")
+            print(f"Re-Planned Task Tree XML:\n{clean}")
         return clean
 
     def display_and_pass(self, ai_response: Any) -> str:

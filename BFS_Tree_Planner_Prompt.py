@@ -17,6 +17,7 @@ Use the following XML format to structure your task tree:
     <task_priority>1</task_priority>
     <parent_task_no>0</parent_task_no>
     <original_question>{input_question}</original_question>
+    <tools_available>{tools_available}</tools_available>
     <thought>Your initial thought on how to approach and answer the original_question</thought>
     <is_leaf>is this a leaf node? yes/no</is_leaf>
     <sub_tasks>
@@ -63,6 +64,7 @@ Document your updated task tree in the specified XML format.
 
 DO NOT GENERATE REASONS. YOU WILL EITHER GENERATE AN UPDATED TASK TREE XML OR RETURN "<NO_REPLAN>".
 REPLAN THE TASK TREE ONLY IF NECESSARY. DO NOT MAKE CHANGES FOR THE SAKE OF IT.
+FOR TOOL EXECUTION ERROR, USE ONLY THE TOOLS AVAILABLE IN THE ORIGINAL TASK TREE TO REPLAN THE TASK TREE.
 IF THE TASK TREE IS ALREADY OPTIMAL, DO NOT MAKE ANY CHANGES. JUST RETURN "<NO_REPLAN>".
 
 
@@ -75,6 +77,7 @@ Use the following XML format to structure your updated task tree:
     <task_priority>1</task_priority>
     <parent_task_no>0</parent_task_no>
     <original_question></original_question>
+    <tools_available></tools_available>
     <thought>Your initial thought on how to approach and answer the original_question</thought>
     <is_leaf>is this a leaf node? yes/no</is_leaf>
     <sub_tasks>
