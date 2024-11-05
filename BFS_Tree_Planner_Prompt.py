@@ -12,6 +12,7 @@ Use the following XML format to structure your task tree:
 
 <task_tree>
   <task>
+    <prime_objective>{prime_objective}</prime_objective>
     <level_no>0</level_no>
     <task_no>0</task_no>
     <task_priority>1</task_priority>
@@ -72,6 +73,7 @@ Use the following XML format to structure your updated task tree:
 
 <task_tree>
   <task>
+    <prime_objective></prime_objective>
     <level_no>0</level_no>
     <task_no>0</task_no>
     <task_priority>1</task_priority>
