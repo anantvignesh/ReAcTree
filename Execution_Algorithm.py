@@ -1,11 +1,11 @@
-import xml.etree.ElementTree as ET
+import json
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any
-from HelperMethods import clean_xml
+from HelperMethods import clean_json
 from langchain import PromptTemplate
 from langchain_core.runnables import RunnableLambda
-from BFS_Tree_Planner_Prompt import replanner_prompt_template_xml
+from BFS_Tree_Planner_Prompt import replanner_prompt_template_json
 from langchain_openai import ChatOpenAI
 
 
@@ -41,8 +41,8 @@ class ExecutionAlgorithm:
 
         self.list_of_tools_str = convert_tools(list_of_tools)
         self.tools: Dict[str, Any] = {tool.name: tool for tool in list_of_tools}
-        self.model = ChatOpenAI(model="gpt-4o", temperature=0.1, max_tokens=4096)
-        self.task_replanner_prompt = PromptTemplate.from_template(replanner_prompt_template_xml)
+        self.model = ChatOpenAI(model="gpt-4", temperature=0.1, max_tokens=4096)
+        self.task_replanner_prompt = PromptTemplate.from_template(replanner_prompt_template_json)
         self.tree_replanner_chain = (self.task_replanner_prompt
                                      | self.model
                                      | RunnableLambda(self.filter_clean_display_pass))
@@ -57,7 +57,7 @@ class ExecutionAlgorithm:
         Returns:
             str: The cleaned response.
         """
-        clean = clean_xml(modelResponse.content)
+        clean = clean_json(modelResponse.content)
         return clean
 
     def filter_clean_display_pass(self, modelResponse: Any) -> str:
@@ -71,13 +71,13 @@ class ExecutionAlgorithm:
             str: The cleaned response.
         """
         try:
-            clean = clean_xml(modelResponse.content)
+            clean = clean_json(modelResponse.content)
         except:
-            # replanner gives <NO_REPLAN> if no replan is needed
-            # which is not a proper XML which might create error if not handled
+            # Replanner gives <NO_REPLAN> if no replan is needed
+            # which is not a proper JSON, so we handle it
             clean = modelResponse.content
         if self.verbose:
-            print(f"Re-Planned Task Tree XML:\n{clean}")
+            print(f"Re-Planned Task Tree JSON:\n{clean}")
         return clean
 
     def display_and_pass(self, ai_response: Any) -> str:
@@ -104,20 +104,20 @@ class ExecutionAlgorithm:
         if self.verbose:
             print(f"Prompt:\n{prompt}")
 
-    def replanner(self, task_tree_xml: str, tools_as_str: str) -> str:
+    def replanner(self, task_tree_json: str, tools_as_str: str) -> str:
         """
-        Replan the task tree using the replaner model.
+        Replan the task tree using the replanner model.
 
         Args:
-            task_tree_xml (str): The current task tree in XML format.
+            task_tree_json (str): The current task tree in JSON format.
             tools_as_str (str): A string representation of the tools available.
 
         Returns:
-            str: The replaned task tree in XML format.
+            str: The replanned task tree in JSON format.
         """
-        prompt = self.task_replanner_prompt.format(current_task_tree=task_tree_xml, tools=tools_as_str)
-        #self.display_prompt(prompt)
-        replan_response = self.tree_replanner_chain.invoke({"current_task_tree": task_tree_xml, "tools": tools_as_str})
+        prompt = self.task_replanner_prompt.format(current_task_tree=task_tree_json, tools=tools_as_str)
+        # self.display_prompt(prompt)
+        replan_response = self.tree_replanner_chain.invoke({"current_task_tree": task_tree_json, "tools": tools_as_str})
         return replan_response
 
     def _execute_tool(self, action: str, action_input: str) -> str:
@@ -136,200 +136,195 @@ class ExecutionAlgorithm:
             raise ValueError(f"Tool {action} not found.")
         print(f"Executing tool {action} with input: {action_input}")
         result = tool.run(action_input)
-        #print(f"Tool {action} executed successfully. Result is {result}" )
+        # print(f"Tool {action} executed successfully. Result is {result}")
         return result
 
-    def _execute_task(self, task: ET.Element) -> ET.Element:
+    def _execute_task(self, task: dict) -> dict:
         """
         Execute a single task.
 
         Args:
-            task (ET.Element): The task element to be executed.
-        """
-        print(f"Executing task:\n{ET.tostring(task, encoding='unicode')}") # Logging statement
+            task (dict): The task dictionary to be executed.
 
-        action = task.find('action').text
-        action_input = task.find('action_input').text
-        observation = task.find('observation')
+        Returns:
+            dict: The updated task dictionary.
+        """
+        print(f"Executing task:\n{json.dumps(task, indent=2)}")  # Logging statement
+
+        action = task.get('action')
+        action_input = task.get('action_input')
+        observation = task.get('observation')
 
         try:
             result = self._execute_tool(action, action_input)
-            task.find('observation').text = result
+            task['observation'] = result
         except Exception as e:
-            task.find('observation').text = "Tool execution failed."
+            task['observation'] = "Tool execution failed."
             print(f"Tool execution failed for action: {action} due to error: {e}")
 
-        #print(f"Task result: \n{task.find('observation').text}")
+        # print(f"Task result: \n{task.get('observation')}")
         return task
 
-    def process_task_bfs_parallel(self, xml_string: str) -> str:
+    def process_task_bfs_parallel(self, json_string: str) -> str:
         """
         Execute tasks in a breadth-first search (BFS) manner and optionally replan.
 
         Args:
-            xml_string (str): The task tree in XML format.
+            json_string (str): The task tree in JSON format.
 
         Returns:
-            str: The final task tree in XML format after execution and replanning.
+            str: The final task tree in JSON format after execution and replanning.
         """
-        xml_string = clean_xml(xml_string)
-        root = ET.fromstring(xml_string)
-        queue = deque([root])
+        json_string = clean_json(json_string)
+        root = json.loads(json_string)
+        queue = deque([root['task_tree']['task']])
 
         while queue:
-            node = queue.popleft()
-            tasks = node.findall('.//task')
+            level_size = len(queue)
+            current_level_tasks = []
+
+            # Collect tasks at current level
+            for _ in range(level_size):
+                task = queue.popleft()
+                current_level_tasks.append(task)
+
+                # Enqueue subtasks for next level
+                if 'sub_tasks' in task and isinstance(task['sub_tasks'], list):
+                    queue.extend(task['sub_tasks'])
 
             with ThreadPoolExecutor() as executor:
-                futures = {executor.submit(self._execute_task, task): task for task in tasks if task.find('.//level_no').text.strip() != "0" and task.find('.//observation').text is None}
+                futures = {executor.submit(self._execute_task, task): task for task in current_level_tasks
+                           if str(task.get('level_no')).strip() != "0" and not task.get('observation')}
                 print(f"Futures submitted: {futures}")  # Logging statement
 
                 for future in as_completed(futures):
                     task = futures[future]
                     try:
                         future.result()
-                        # Ensure the updated task is correctly placed back in the original tree
-                        #node.replace(task, updated_task)
                     except Exception as e:
-                        print(f"Task {task.find('.//task_no').text} failed due to {e}")
-
-            for task in tasks:
-                sub_tasks = task.find('.//sub_tasks')
-                if sub_tasks is not None:
-                    queue.extend(sub_tasks.findall('.//task'))
+                        print(f"Task {task.get('task_no')} failed due to {e}")
 
             if self.replan_enable:
-                current_tree = ET.tostring(root, encoding='unicode')
-                replan_xml = self.replanner(current_tree, self.list_of_tools_str)
-                if replan_xml != "<NO_REPLAN>":
-                    root = ET.fromstring(replan_xml)
-                    queue = deque([root])
+                current_tree = json.dumps(root)
+                replan_json = self.replanner(current_tree, self.list_of_tools_str)
+                if replan_json != "<NO_REPLAN>":
+                    root = json.loads(replan_json)
+                    queue = deque([root['task_tree']['task']])
 
-        response_xml = ET.tostring(root, encoding='unicode')
-        return response_xml
+        response_json = json.dumps(root)
+        return response_json
 
-    def process_task_dfs_parallel(self, xml_string: str) -> str:
+    def process_task_dfs_parallel(self, json_string: str) -> str:
         """
         Execute tasks in a depth-first search (DFS) manner and optionally replan.
 
         Args:
-            xml_string (str): The task tree in XML format.
+            json_string (str): The task tree in JSON format.
 
         Returns:
-            str: The final task tree in XML format after execution and replanning.
+            str: The final task tree in JSON format after execution and replanning.
         """
-        xml_string = clean_xml(xml_string)
-        root = ET.fromstring(xml_string)
-        stack = [root]
+        json_string = clean_json(json_string)
+        root = json.loads(json_string)
+        stack = [root['task_tree']['task']]
 
         while stack:
-            current_node = stack.pop()
-            tasks = current_node.findall('.//task')
+            task = stack.pop()
 
-            with ThreadPoolExecutor() as executor:
-                futures = {executor.submit(self._execute_task, task): task for task in tasks if task.find('.//level_no').text.strip() != "0" and task.find('.//observation').text is None}
-                print(f"Futures submitted: {futures}")  # Logging statement
+            if str(task.get('level_no')).strip() != "0" and not task.get('observation'):
+                with ThreadPoolExecutor() as executor:
+                    future = executor.submit(self._execute_task, task)
+                    print(f"Future submitted: {future}")  # Logging statement
 
-                for future in as_completed(futures):
-                    task = futures[future]
                     try:
                         future.result()
-                        # Ensure the updated task is correctly placed back in the original tree
-                        #current_node.replace(task, updated_task)
                     except Exception as e:
-                        print(f"Task {task.find('.//task_no').text} failed due to {e}")
+                        print(f"Task {task.get('task_no')} failed due to {e}")
 
-            for task in reversed(tasks):
-                sub_tasks = task.find('.//sub_tasks')
-                if sub_tasks is not None:
-                    stack.extend(sub_tasks.findall('.//task'))
+            # Push subtasks onto the stack in reverse order to maintain order
+            if 'sub_tasks' in task and isinstance(task['sub_tasks'], list):
+                stack.extend(reversed(task['sub_tasks']))
 
             if self.replan_enable:
-                current_tree = ET.tostring(root, encoding='unicode')
-                replan_xml = self.replanner(current_tree, self.list_of_tools_str)
-                if replan_xml != "<NO_REPLAN>":
-                    root = ET.fromstring(replan_xml)
-                    stack = [root]
+                current_tree = json.dumps(root)
+                replan_json = self.replanner(current_tree, self.list_of_tools_str)
+                if replan_json != "<NO_REPLAN>":
+                    root = json.loads(replan_json)
+                    stack = [root['task_tree']['task']]
 
-        response_xml = ET.tostring(root, encoding='unicode')
-        return response_xml
+        response_json = json.dumps(root)
+        return response_json
 
-    def process_task_bfs(self, xml_string: str) -> str:
+    def process_task_bfs(self, json_string: str) -> str:
         """
-        Execute tasks in a breadth-first search (BFS) manner and optionally replan.
+        Execute tasks in a breadth-first search (BFS) manner without parallelism and optionally replan.
 
         Args:
-            xml_string (str): The task tree in XML format.
+            json_string (str): The task tree in JSON format.
 
         Returns:
-            str: The final task tree in XML format after execution and replanning.
+            str: The final task tree in JSON format after execution and replanning.
         """
-        xml_string = clean_xml(xml_string)
-        root = ET.fromstring(xml_string)
-        queue = deque([root])
+        json_string = clean_json(json_string)
+        root = json.loads(json_string)
+        queue = deque([root['task_tree']['task']])
 
         while queue:
-            node = queue.popleft()
-            tasks = node.findall('.//task')
+            task = queue.popleft()
 
-            for task in tasks:
-                if task.find('.//level_no').text.strip() != "0" and task.find('.//observation').text is None:
-                    try:
-                        self._execute_task(task)
-                    except Exception as e:
-                        print(f"Task {task.find('.//task_no').text} failed due to {e}")
+            if str(task.get('level_no')).strip() != "0" and not task.get('observation'):
+                try:
+                    self._execute_task(task)
+                except Exception as e:
+                    print(f"Task {task.get('task_no')} failed due to {e}")
 
-            for task in tasks:
-                sub_tasks = task.find('.//sub_tasks')
-                if sub_tasks is not None:
-                    queue.extend(sub_tasks.findall('.//task'))
+            # Enqueue subtasks for next level
+            if 'sub_tasks' in task and isinstance(task['sub_tasks'], list):
+                queue.extend(task['sub_tasks'])
 
             if self.replan_enable:
-                current_tree = ET.tostring(root, encoding='unicode')
-                replan_xml = self.replanner(current_tree, self.list_of_tools_str)
-                if replan_xml != "<NO_REPLAN>":
-                    root = ET.fromstring(replan_xml)
-                    queue = deque([root])
+                current_tree = json.dumps(root)
+                replan_json = self.replanner(current_tree, self.list_of_tools_str)
+                if replan_json != "<NO_REPLAN>":
+                    root = json.loads(replan_json)
+                    queue = deque([root['task_tree']['task']])
 
-        response_xml = ET.tostring(root, encoding='unicode')
-        return response_xml
+        response_json = json.dumps(root)
+        return response_json
 
-    def process_task_dfs(self, xml_string: str) -> str:
+    def process_task_dfs(self, json_string: str) -> str:
         """
-        Execute tasks in a depth-first search (DFS) manner and optionally replan.
+        Execute tasks in a depth-first search (DFS) manner without parallelism and optionally replan.
 
         Args:
-            xml_string (str): The task tree in XML format.
+            json_string (str): The task tree in JSON format.
 
         Returns:
-            str: The final task tree in XML format after execution and replanning.
+            str: The final task tree in JSON format after execution and replanning.
         """
-        xml_string = clean_xml(xml_string)
-        root = ET.fromstring(xml_string)
-        stack = [root]
+        json_string = clean_json(json_string)
+        root = json.loads(json_string)
+        stack = [root['task_tree']['task']]
 
         while stack:
-            current_node = stack.pop()
-            tasks = current_node.findall('.//task')
+            task = stack.pop()
 
-            for task in tasks:
-                if task.find('.//level_no').text.strip() != "0" and task.find('.//observation').text is None:
-                    try:
-                        self._execute_task(task)
-                    except Exception as e:
-                        print(f"Task {task.find('.//task_no').text} failed due to {e}")
+            if str(task.get('level_no')).strip() != "0" and not task.get('observation'):
+                try:
+                    self._execute_task(task)
+                except Exception as e:
+                    print(f"Task {task.get('task_no')} failed due to {e}")
 
-            for task in reversed(tasks):
-                sub_tasks = task.find('.//sub_tasks')
-                if sub_tasks is not None:
-                    stack.extend(sub_tasks.findall('.//task'))
+            # Push subtasks onto the stack in reverse order to maintain order
+            if 'sub_tasks' in task and isinstance(task['sub_tasks'], list):
+                stack.extend(reversed(task['sub_tasks']))
 
             if self.replan_enable:
-                current_tree = ET.tostring(root, encoding='unicode')
-                replan_xml = self.replanner(current_tree, self.list_of_tools_str)
-                if replan_xml != "<NO_REPLAN>":
-                    root = ET.fromstring(replan_xml)
-                    stack = [root]
+                current_tree = json.dumps(root)
+                replan_json = self.replanner(current_tree, self.list_of_tools_str)
+                if replan_json != "<NO_REPLAN>":
+                    root = json.loads(replan_json)
+                    stack = [root['task_tree']['task']]
 
-        response_xml = ET.tostring(root, encoding='unicode')
-        return response_xml
+        response_json = json.dumps(root)
+        return response_json

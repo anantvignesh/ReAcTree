@@ -1,10 +1,10 @@
+import json
 from langchain import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-from BFS_Tree_Planner_Prompt import task_planner_prompt_template_xml, final_answer_prompt_template
+from BFS_Tree_Planner_Prompt import task_planner_prompt_template_json, final_answer_prompt_template_json
 from Execution_Algorithm import ExecutionAlgorithm
-from HelperMethods import clean_xml
+from HelperMethods import clean_json
 from langchain_openai import ChatOpenAI
-import xml.etree.ElementTree as ET
 
 def tool_name_and_description(tools):
     """
@@ -46,15 +46,15 @@ class TaskTree:
         """
         self.verbose = verbose
         self.replan_enable = replan_enable
-        self.model = ChatOpenAI(model="gpt-4o", temperature=0.1, max_tokens=4096)
+        self.model = ChatOpenAI(model="gpt-4", temperature=0.1, max_tokens=4096)
         self.tools = langchainTools
 
         # Initialize the execution algorithm with the list of tools
         self.exec_algo = ExecutionAlgorithm(list_of_tools=self.tools, replan_enable=self.replan_enable, verbose=self.verbose)
 
         # Load prompts
-        self.task_planner_prompt = PromptTemplate.from_template(task_planner_prompt_template_xml)
-        self.final_answer_prompt = PromptTemplate.from_template(final_answer_prompt_template)
+        self.task_planner_prompt = PromptTemplate.from_template(task_planner_prompt_template_json)
+        self.final_answer_prompt = PromptTemplate.from_template(final_answer_prompt_template_json)
 
         # Define the chains for task planning and final answer composition
         self.tree_planner_chain = (self.task_planner_prompt
@@ -82,7 +82,7 @@ class TaskTree:
         Returns:
             str: The cleaned response.
         """
-        clean = clean_xml(modelResponse.content)
+        clean = clean_json(modelResponse.content)
         return clean
 
     def filter_clean_display_pass(self, modelResponse):
@@ -95,9 +95,9 @@ class TaskTree:
         Returns:
             str: The cleaned response.
         """
-        clean = clean_xml(modelResponse.content)
+        clean = clean_json(modelResponse.content)
         if self.verbose:
-            print(f"Task Tree XML:\n{clean}")
+            print(f"Task Tree JSON:\n{clean}")
         return clean
 
     def display_and_pass(self, ai_response):
@@ -128,30 +128,32 @@ class TaskTree:
             print(prompt.text)
         return prompt
 
-    def extract_thoughts_and_observations(self, xml_string):
+    def extract_thoughts_and_observations(self, json_string):
         """
-        Parses an XML string to extract the initial thought or goal, and the thoughts
+        Parses a JSON string to extract the initial thought or goal, and the thoughts
         and observations from leaf nodes marked with "yes".
 
         Args:
-            xml_string (str): The XML string to be parsed.
+            json_string (str): The JSON string to be parsed.
 
         Returns:
             str: A formatted string containing the extracted information.
         """
-        root = ET.fromstring(xml_string)
-        initial_thought = root.find(".//thought").text
+        root = json.loads(json_string)
+        initial_thought = root['task_tree']['task'].get('thought', '')
         leaf_thoughts_observations = []
 
-        def process_node(node):
-            for task in node.findall(".//task"):
-                is_leaf = task.find("is_leaf").text
-                if is_leaf.lower() == "yes":
-                    thought = task.find("thought").text
-                    observation = task.find("observation").text
-                    leaf_thoughts_observations.append((thought, observation))
+        def process_node(task):
+            is_leaf = task.get('is_leaf', '').lower()
+            if is_leaf == 'yes':
+                thought = task.get('thought', '')
+                observation = task.get('observation', '')
+                leaf_thoughts_observations.append((thought, observation))
+            if 'sub_tasks' in task and isinstance(task['sub_tasks'], list):
+                for sub_task in task['sub_tasks']:
+                    process_node(sub_task)
 
-        process_node(root)
+        process_node(root['task_tree']['task'])
 
         # Format the output
         formatted_output = f"Initial Thought: {initial_thought}\n\n"
@@ -161,18 +163,18 @@ class TaskTree:
 
         return formatted_output.strip()
 
-    def extract_original_question(self, xml_string):
+    def extract_original_question(self, json_string):
         """
-        Parses an XML string to extract the original question.
+        Parses a JSON string to extract the original question.
 
         Args:
-            xml_string (str): The XML string to be parsed.
+            json_string (str): The JSON string to be parsed.
 
         Returns:
             str: The original question.
         """
-        root = ET.fromstring(xml_string)
-        original_question = root.find(".//original_question").text
+        root = json.loads(json_string)
+        original_question = root['task_tree']['task'].get('original_question', '')
         return original_question
 
     def test_tree_planner(self, message):
@@ -188,7 +190,7 @@ class TaskTree:
         response = self.tree_planner_chain.invoke({"input_question": message,
                                                    "tools": tool_name_and_description(self.tools),
                                                    "tools_available": tool_name(self.tools)})
-        return "```xml\n"+response+"\n```"
+        return "```json\n"+response+"\n```"
 
     def get_reply_bfs(self, message, verbose=False):
         """
